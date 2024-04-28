@@ -1,0 +1,76 @@
+import os
+import telebot
+import pandas as pd
+from openpyxl import Workbook
+
+# Get the directory path of the script file
+script_dir = os.path.dirname(os.path.abspath(__file__))
+excel_file_path = os.path.join(script_dir, "user_answers.xlsx")
+
+# Initialize the bot with your bot token
+bot = telebot.TeleBot("6786222291:AAERZ4oVLcsa0eNakXEfPFgApYY29I56UIw")
+
+# Dictionary to store user answers
+user_answers = {}
+
+# Dictionary to store user IDs and usernames
+user_info = {}
+
+# Questions list
+questions = [
+   "О каком вебинаре Вы хотите рассказать?",
+    "Что вам больше всего понравилось в теме вебинара и почему?",
+    "Были ли моменты в вебинаре, которые вызвали затруднения в понимании материала? Можете описать их?",
+    "Какие аспекты вебинара, по вашему мнению, нуждаются в улучшении и какие конкретные изменения вы бы предложили?",
+    "Есть ли темы или вопросы, которые вы бы хотели изучить более подробно в следующих занятиях?"
+]
+
+# Handler for /start command
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    markup = telebot.types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+    itembtn = telebot.types.KeyboardButton('/start bot')
+    markup.add(itembtn)
+    bot.send_message(message.chat.id, "Здравствуйте,вы попали в бота для оставления отзыва на GeekBrains.На шкале от 1 до 10,насколько вы готовы поделится вашим мнением о вебинаре?", reply_markup=markup)
+
+# Handler for each question
+@bot.message_handler(func=lambda message: True)
+def ask_question(message):
+    user_id = message.from_user.id
+
+    if user_id not in user_answers:
+        user_answers[user_id] = []
+
+    user_answers[user_id].append(message.text)
+
+    if len(user_answers[user_id]) < len(questions):
+        bot.send_message(message.chat.id, questions[len(user_answers[user_id])])
+    else:
+        bot.send_message(message.chat.id, "Спасибо за ответы!")
+        save_answers(user_id)
+
+
+# Function to ask the next question
+def ask_next_question(chat_id):
+    user_id = chat_id
+    if user_id not in user_answers or len(user_answers[user_id]) < len(questions):
+        next_question_index = len(user_answers.get(user_id, []))
+        bot.send_message(chat_id, questions[next_question_index])
+    else:
+        bot.send_message(chat_id, "Спасибо за ответы!")
+        save_answers(user_id)
+
+# Function to save answers to Excel file
+def save_answers(user_id):
+    answers_dict = {}
+    for uid, answers in user_answers.items():
+        user_data = bot.get_chat_member(uid, uid).user
+        username = user_data.username if user_data.username else ""
+        full_name = user_data.first_name + " " + user_data.last_name if user_data.last_name else user_data.first_name if user_data.first_name else ""
+        user_identifier = f"{uid} ({full_name} - @{username})" if username else f"{uid}"
+        answers_dict[user_identifier] = answers
+
+
+
+# Start the bot
+bot.polling()
